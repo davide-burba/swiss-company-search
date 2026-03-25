@@ -1,8 +1,8 @@
 """Add embedding vector column for semantic search
 
 Revision ID: c4e5f6a7b8c9
-Revises: 9a1acd05fe3a
-Create Date: 2026-03-08 10:00:00.000000
+Revises: a3f8c2d91b47
+Create Date: 2026-03-08 18:00:00.000000
 
 """
 
@@ -34,7 +34,9 @@ def upgrade() -> None:
         ),
     )
     # Swap the column to the real vector type after adding it
-    op.execute(f"ALTER TABLE zefix_companies ALTER COLUMN embedding TYPE vector({EMBEDDING_DIM}) USING NULL")
+    op.execute(
+        f"ALTER TABLE zefix_companies ALTER COLUMN embedding TYPE vector({EMBEDDING_DIM}) USING NULL"
+    )
 
     # HNSW index for fast approximate nearest-neighbour cosine search
     op.execute(
