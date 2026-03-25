@@ -38,5 +38,9 @@ class ZefixCompany(BaseModel):
                 return f"https://rcnet.ne.ch/extract?companyOfsUid={uid}"
             case "VD":
                 return f"https://prestations.vd.ch/pub/101266/extract?lang=FR&companyOfsUid={uid}"
+            case "VS":
+                return (
+                    f"https://vc.chregister.ch/cr-portal/auszug/auszug.xhtml?uid={uid}"
+                )
             case _:
                 return f"https://{self.canton.lower()}.chregister.ch/cr-portal/auszug/auszug.xhtml?uid={uid}"
