@@ -29,18 +29,20 @@ Browse and search Swiss companies sourced from the [Zefix](https://www.zefix.adm
 # 1. Start the database
 docker compose up -d
 
-# 2. Fetch and process all data (slow, ~800k records)
-just prepare
+# 2. Apply database migrations
+just migrate
 
-# 3. Load data into the database
-just reload
+# 3. Fetch, process, and load data
+# Note: on first run, downloads Switzerland OSM data and translation models from HuggingFace
+just prepare-and-reload-subset   # ~1000 companies, fast (~minutes)
+# just prepare-and-reload        # full dataset (~800k companies, slow ~2 days)
 
 # 4. Start the API
 just start-api   # API swagger at http://localhost:8000/docs
 ```
 
 ```bash
-# 5. Start the UI on a separate terminal
+# 5. Start the UI on a separate terminal
 just start-ui    # React dev server at http://localhost:5173/
 ```
 
