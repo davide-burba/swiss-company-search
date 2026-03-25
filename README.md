@@ -11,12 +11,6 @@ Browse and search Swiss companies sourced from the [Zefix](https://www.zefix.adm
 
 ![Screenshot](media/screenshot.png)
 
-## Stack
-
-- **Backend** — FastAPI + SQLAlchemy + PostgreSQL (pgvector)
-- **Frontend** — React (Vite)
-- **Data pipeline** — Python scripts orchestrated with `just`
-
 ## Prerequisites
 
 - [uv](https://docs.astral.sh/uv/)
@@ -46,6 +40,12 @@ just start-api   # API swagger at http://localhost:8000/docs
 # 5. Start the UI on a separate terminal
 just start-ui    # React dev server at http://localhost:5173/
 ```
+
+## Stack
+
+- **Backend:** FastAPI + SQLAlchemy + PostgreSQL (pgvector)
+- **Frontend:** React (Vite)
+- **Data pipeline:** Python scripts orchestrated with `just`
 
 ## Known limitations
 
