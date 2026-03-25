@@ -1,0 +1,43 @@
+[project]
+name = "swiss-companies"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "alembic>=1.18.4",
+    "ctranslate2>=4.7.1",
+    "fastapi[standard]>=0.135.1",
+    "fasttext-wheel>=0.9.2",
+    "fire>=0.7.1",
+    "langdetect>=1.0.9",
+    "pgvector>=0.3.6",
+    "psycopg2-binary>=2.9",
+    "pydantic>=2.12.5",
+    "pydantic-settings>=2.13.1",
+    "requests>=2.32.5",
+    "sentence-transformers>=3.0.0",
+    "sacremoses>=0.1.1",
+    "sentencepiece>=0.2.1",
+    "sqlalchemy>=2.0.48",
+    "torch>=2.10.0",
+    "tqdm>=4.67.3",
+    "transformers>=5.3.0",
+    "uvicorn>=0.41.0",
+]
+
+[tool.uv]
+package = true
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "mypy>=1.19.1",
+    "ruff>=0.15.4",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/swiss_companies"]
