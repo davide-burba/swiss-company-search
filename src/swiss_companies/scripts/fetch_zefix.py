@@ -1,5 +1,4 @@
 import csv
-import json
 import time
 from pathlib import Path
 
@@ -62,7 +61,7 @@ def sparql_query(query: str) -> list[dict]:
     return response.json()["results"]["bindings"]
 
 
-def fetch_all(cantons: list[str] | None) -> list[dict]:
+def fetch_all(cantons: list[str] | None, limit: int = 0) -> list[dict]:
     canton_filter = build_canton_filter(cantons or [])
     scope = f"cantons {', '.join(cantons)}" if cantons else "all Switzerland"
     print(f"Fetching companies from Zefix — {scope}")
@@ -71,9 +70,10 @@ def fetch_all(cantons: list[str] | None) -> list[dict]:
     offset = 0
 
     while True:
+        page_size = PAGE_SIZE if not limit else min(PAGE_SIZE, limit - len(all_rows))
         query = QUERY.format(
             canton_filter=canton_filter,
-            limit=PAGE_SIZE,
+            limit=page_size,
             offset=offset,
         )
         page = sparql_query(query)
@@ -84,8 +84,8 @@ def fetch_all(cantons: list[str] | None) -> list[dict]:
         all_rows.extend(rows)
         print(f"  fetched {len(all_rows):,} records...", end="\r", flush=True)
 
-        if len(page) < PAGE_SIZE:
-            break  # last page
+        if len(page) < page_size or (limit and len(all_rows) >= limit):
+            break  # last page or limit reached
         offset += PAGE_SIZE
         time.sleep(0.5)  # be polite
 
@@ -95,14 +95,7 @@ def fetch_all(cantons: list[str] | None) -> list[dict]:
 
 def save(companies: list[dict], suffix: str = ""):
     RAW_DIR.mkdir(exist_ok=True)
-    stem = f"companies{suffix}"
-
-    json_path = RAW_DIR / f"{stem}.json"
-    with open(json_path, "w") as f:
-        json.dump(companies, f, ensure_ascii=False, indent=2)
-    print(f"Saved → {json_path}")
-
-    csv_path = RAW_DIR / f"{stem}.csv"
+    csv_path = RAW_DIR / f"companies{suffix}.csv"
     fieldnames = list(companies[0].keys())
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
@@ -136,19 +129,21 @@ def print_stats(companies: list[dict]):
         print(f"  {lf}: {count:,}")
 
 
-def main(cantons: str = "TI,ZH", all: bool = False):
+def main(cantons: str = "TI,ZH", all: bool = False, limit: int = 0):
     """
     Fetch Zefix company data from LINDAS SPARQL endpoint.
 
     Args:
         cantons: Comma-separated canton codes to fetch (default: "TI,ZH")
         all:     Fetch all Swiss companies, ignoring --cantons (slow, ~600k records)
+        limit:   Max number of companies to fetch, 0 = all (default: 0)
 
     Examples:
         python fetch_zefix.py                        # fetch TI and ZH
         python fetch_zefix.py --cantons TI           # only Ticino
         python fetch_zefix.py --cantons TI,ZH,GE     # three cantons
         python fetch_zefix.py --all                  # full Switzerland
+        python fetch_zefix.py --all --limit 1000     # first 1000 companies
     """
     if isinstance(cantons, (list, tuple)):
         canton_list = [c.strip().upper() for c in cantons]
@@ -156,8 +151,10 @@ def main(cantons: str = "TI,ZH", all: bool = False):
         canton_list = [c.strip().upper() for c in cantons.split(",")]
     selected = None if all else canton_list
     suffix = "" if all else f"_{'_'.join(selected)}"
+    if limit:
+        suffix += f"_{limit}"
 
-    companies = fetch_all(selected)
+    companies = fetch_all(selected, limit=limit)
     if companies:
         save(companies, suffix=suffix)
         print_stats(companies)
