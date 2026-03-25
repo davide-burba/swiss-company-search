@@ -7,6 +7,7 @@ Browse and search Swiss companies sourced from the [Zefix](https://www.zefix.adm
 - **Sector classification** (NOGA) inferred from the description
 - **Geolocation** extracted from company addresses
 - **"Near me" filtering** — find companies within a given radius of your location
+- **Cantonal registry links** — direct links to each company's entry in the cantonal commercial registry
 
 ![Screenshot](media/screenshot.png)
 
