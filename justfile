@@ -41,7 +41,7 @@ prepare-subset n="1000":
     just compute-coordinates --input_file companies_{{n}}.csv --output_file coordinates_{{n}}.csv
     just stop-nominatim
     just classify-sectors --input_file descriptions_en_{{n}}.csv --output_file sectors_{{n}}.csv
-    just compute-embeddings --companies_file companies_{{n}}.csv --descriptions_file descriptions_en_{{n}}.csv --output_file embeddings_{{n}}.csv
+    just compute-embeddings
 
 reload:
     just truncate-zefix
@@ -49,7 +49,7 @@ reload:
     just load-translations
     just load-coordinates
     just load-sectors
-    just load-embeddings
+    just compute-embeddings
 
 reload-subset n="1000":
     just truncate-zefix
@@ -57,7 +57,7 @@ reload-subset n="1000":
     just load-translations --input_file descriptions_en_{{n}}.csv
     just load-coordinates --input_file coordinates_{{n}}.csv
     just load-sectors --input_file sectors_{{n}}.csv
-    just load-embeddings --input_file embeddings_{{n}}.csv
+    just compute-embeddings
 
 prepare-and-reload:
     just prepare
@@ -97,9 +97,6 @@ load-coordinates *args:
 
 compute-embeddings *args:
     uv run python -m swiss_companies.scripts.compute_embeddings {{args}}
-
-load-embeddings *args:
-    uv run python -m swiss_companies.scripts.load_embeddings {{args}}
 
 classify-sectors *args:
     uv run python -m swiss_companies.scripts.classify_sectors {{args}}
