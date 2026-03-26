@@ -1,27 +1,31 @@
 """
-Compute and store sentence embeddings for semantic search.
+Compute sentence embeddings for semantic search.
 
-Encodes each company as "{legal_name}. {description_en}" (or just the name
-when no description is available) using a sentence-transformers model and
-writes the resulting vector directly into the `embedding` column.
+Reads companies from data_raw/<companies_file> and translations from
+data_intermediate/<descriptions_file>, encodes each company as
+"{legal_name}. {description_en}" (or just the name when no description
+is available) using a sentence-transformers model, and writes uid/embedding
+pairs to data_intermediate/<output_file>.
 
-Resume-safe: only processes rows where embedding IS NULL.
+Resume-safe: skips UIDs already present in the output file.
 
 Examples:
     uv run python -m swiss_companies.scripts.compute_embeddings
     uv run python -m swiss_companies.scripts.compute_embeddings --model all-mpnet-base-v2
-    uv run python -m swiss_companies.scripts.compute_embeddings --batch_size 256
+    uv run python -m swiss_companies.scripts.compute_embeddings --companies_file companies_1000.csv
 """
+
+import csv
+import json
+from pathlib import Path
 
 import fire
 import torch
 from sentence_transformers import SentenceTransformer
-from sqlalchemy import select, update
 from tqdm import tqdm
 
-from swiss_companies.config import GlobalConfig
-from swiss_companies.database import DelayedDB
-from swiss_companies.models import ZefixCompany
+DATA_RAW = Path("data_raw")
+DATA_INTERMEDIATE = Path("data_intermediate")
 
 
 def _company_text(legal_name: str, description_en: str | None) -> str:
@@ -31,21 +35,56 @@ def _company_text(legal_name: str, description_en: str | None) -> str:
 
 
 def compute(
+    companies_file: str = "companies.csv",
+    descriptions_file: str = "descriptions_en.csv",
+    output_file: str = "embeddings.csv",
     model: str = "sentence-transformers/all-MiniLM-L6-v2",
     batch_size: int = 512,
 ):
     """
-    Compute sentence embeddings and store them in the database.
+    Compute sentence embeddings and write them to a CSV file.
 
     Args:
-        model:      Sentence-transformers model name (default: all-MiniLM-L6-v2)
-        batch_size: Companies to encode per batch (default: 512)
+        companies_file:   CSV filename in data_raw/ (default: companies.csv)
+        descriptions_file: CSV filename in data_intermediate/ (default: descriptions_en.csv)
+        output_file:      CSV filename in data_intermediate/ (default: embeddings.csv)
+        model:            Sentence-transformers model name (default: all-MiniLM-L6-v2)
+        batch_size:       Companies to encode per batch (default: 512)
     """
-    config = GlobalConfig()
-    db = DelayedDB()
-    db.setup(config.db_url.get_secret_value())
+    companies_path = DATA_RAW / companies_file
+    descriptions_path = DATA_INTERMEDIATE / descriptions_file
+    output_path = DATA_INTERMEDIATE / output_file
+    DATA_INTERMEDIATE.mkdir(exist_ok=True)
 
-    # ── Device ───────────────────────────────────────────────────────────────
+    # ── Resume: load already-computed UIDs ───────────────────────────────────
+    already_done: set[str] = set()
+    if output_path.exists():
+        with open(output_path, newline="", encoding="utf-8") as f:
+            for row in csv.DictReader(f):
+                already_done.add(row["uid"])
+        print(f"Resuming: {len(already_done):,} UIDs already computed.")
+
+    # ── Load descriptions ─────────────────────────────────────────────────────
+    descriptions: dict[str, str] = {}
+    if descriptions_path.exists():
+        with open(descriptions_path, newline="", encoding="utf-8") as f:
+            for row in csv.DictReader(f):
+                descriptions[row["uid"]] = row["description_en"]
+
+    # ── Load companies ────────────────────────────────────────────────────────
+    rows = []
+    with open(companies_path, newline="", encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            if row["uid"] not in already_done:
+                rows.append({"uid": row["uid"], "legal_name": row["legalName"]})
+
+    if not rows:
+        print("Nothing to do.")
+        return
+
+    print(f"Encoding {len(rows):,} companies in batches of {batch_size}…")
+
+    # ── Device ────────────────────────────────────────────────────────────────
     if torch.backends.mps.is_available():
         device = "mps"
     elif torch.cuda.is_available():
@@ -53,33 +92,22 @@ def compute(
     else:
         device = "cpu"
     print(f"Using device: {device}")
-
     print(f"Loading model: {model}")
     st_model = SentenceTransformer(model, device=device)
 
-    with db.engine.connect() as conn:
-        # Count remaining
-        from sqlalchemy import func
-        total_remaining = conn.scalar(
-            select(func.count()).select_from(ZefixCompany).where(ZefixCompany.embedding.is_(None))
-        ) or 0
-        print(f"Companies without embeddings: {total_remaining:,}")
-        if not total_remaining:
-            print("Nothing to do.")
-            return
+    # ── Encode and write ──────────────────────────────────────────────────────
+    write_header = not output_path.exists() or output_path.stat().st_size == 0
+    with open(output_path, "a", newline="", encoding="utf-8") as out_f:
+        writer = csv.DictWriter(out_f, fieldnames=["uid", "embedding"])
+        if write_header:
+            writer.writeheader()
 
-        # Stream rows without embeddings
-        stmt = select(ZefixCompany.uid, ZefixCompany.legal_name, ZefixCompany.description_en).where(
-            ZefixCompany.embedding.is_(None)
-        )
-        rows = list(conn.execute(stmt))
-
-    print(f"Encoding {len(rows):,} companies in batches of {batch_size}…")
-
-    with db.engine.begin() as conn:
         for i in tqdm(range(0, len(rows), batch_size), desc="Embedding", unit="batch"):
             batch = rows[i : i + batch_size]
-            texts = [_company_text(r.legal_name, r.description_en) for r in batch]
+            texts = [
+                _company_text(r["legal_name"], descriptions.get(r["uid"]))
+                for r in batch
+            ]
             embeddings = st_model.encode(
                 texts,
                 convert_to_numpy=True,
@@ -87,13 +115,11 @@ def compute(
                 normalize_embeddings=True,
             )
             for row, emb in zip(batch, embeddings):
-                conn.execute(
-                    update(ZefixCompany)
-                    .where(ZefixCompany.uid == row.uid)
-                    .values(embedding=emb.tolist())
+                writer.writerow(
+                    {"uid": row["uid"], "embedding": json.dumps(emb.tolist())}
                 )
 
-    print(f"\nDone. {len(rows):,} embeddings stored.")
+    print(f"\nDone. {len(rows):,} embeddings saved → {output_path}")
 
 
 if __name__ == "__main__":
