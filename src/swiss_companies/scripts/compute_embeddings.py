@@ -24,6 +24,8 @@ import torch
 from sentence_transformers import SentenceTransformer
 from tqdm import tqdm
 
+from swiss_companies.config import EMBEDDING_MODEL
+
 DATA_RAW = Path("data_raw")
 DATA_INTERMEDIATE = Path("data_intermediate")
 
@@ -38,7 +40,7 @@ def compute(
     companies_file: str = "companies.csv",
     descriptions_file: str = "descriptions_en.csv",
     output_file: str = "embeddings.csv",
-    model: str = "sentence-transformers/all-MiniLM-L6-v2",
+    model: str = EMBEDDING_MODEL,
     batch_size: int = 512,
 ):
     """

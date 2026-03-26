@@ -1,6 +1,8 @@
 from pydantic import Field, SecretStr, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+
 
 class GlobalConfig(BaseSettings):
     db_host: str = Field(default="localhost")

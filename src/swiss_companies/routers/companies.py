@@ -6,6 +6,7 @@ from sentence_transformers import SentenceTransformer
 from sqlalchemy import func, literal, select
 from sqlalchemy.orm import Session
 
+from swiss_companies.config import EMBEDDING_MODEL
 from swiss_companies.database import get_session
 from swiss_companies.models import ZefixCompany
 from swiss_companies.schemas import CompanyPage
@@ -13,13 +14,12 @@ from swiss_companies.schemas import CompanyPage
 router = APIRouter(prefix="/companies", tags=["companies"])
 
 _embedding_model: SentenceTransformer | None = None
-_EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 
 
 def _get_embedding_model() -> SentenceTransformer:
     global _embedding_model
     if _embedding_model is None:
-        _embedding_model = SentenceTransformer(_EMBEDDING_MODEL_NAME)
+        _embedding_model = SentenceTransformer(EMBEDDING_MODEL)
     return _embedding_model
 
 

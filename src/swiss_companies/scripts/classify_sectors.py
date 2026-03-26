@@ -20,6 +20,7 @@ import torch
 from sentence_transformers import SentenceTransformer
 from tqdm import tqdm
 
+from swiss_companies.config import EMBEDDING_MODEL
 from swiss_companies.noga import NOGA_DIVISIONS
 
 DATA_INTERMEDIATE = Path("data_intermediate")
@@ -45,7 +46,7 @@ def _cosine_sim(a: np.ndarray, b: np.ndarray) -> np.ndarray:
 def classify(
     input_file: str = "descriptions_en.csv",
     output_file: str = "sectors.csv",
-    model: str = "sentence-transformers/all-MiniLM-L6-v2",
+    model: str = EMBEDDING_MODEL,
     batch_size: int = 512,
 ):
     """
